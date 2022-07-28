@@ -1,0 +1,171 @@
+FROM carlasim/carla:0.9.10.1 AS carla-builder
+
+### Build ROS-supported environment
+FROM nvidia/cuda:11.4.2-devel-ubuntu20.04 AS nvidia-env
+
+ENV CARLA_VERSION=0.9.10.1
+ENV ROS_BUILD=noetic
+
+ENV DEBIAN_FRONTEND=noninteractive 
+ENV DEBCONF_NONINTERACTIVE_SEEN=true
+
+RUN apt-get update && apt-get install -y \
+      sudo \
+      python-dev \
+      python3-pip \
+      iputils-ping \ 
+      netcat \
+      libnvidia-gl-440 \
+      software-properties-common \
+      git \
+      tmux \
+      && \
+    rm -rf /var/lib/apt/lists/*
+
+ENV NVIDIA_VISIBLE_DEVICES \
+    ${NVIDIA_VISIBLE_DEVICES:-all}
+ENV NVIDIA_DRIVER_CAPABILITIES \
+    ${NVIDIA_DRIVER_CAPABILITIES:+$NVIDIA_DRIVER_CAPABILITIES,}graphics
+
+##### Setup user
+RUN useradd -m paas && echo "paas:paas" | chpasswd && adduser paas sudo
+USER paas
+CMD /bin/bash
+
+WORKDIR /home/paas
+ENV HOME=/home/paas
+
+USER root
+RUN pip install torch==1.8.0+cu111 torchvision==0.9.0+cu111 -f https://download.pytorch.org/whl/torch_stable.html
+RUN pip install spconv-cu114
+
+ENV PATH="$PATH:/usr/local/cuda-11.4/bin"
+ENV LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/local/cuda-11.4/lib64"
+ENV TORCH_CUDA_ARCH_LIST="8.0 8.6+PTX"
+
+### Build for Planatix Environment and Development
+FROM nvidia-env as standalone
+
+USER paas
+##### Setup env
+ENV PAAS=$HOME/PAAS
+ENV TEAM_CODE_ROOT $HOME/PAAS
+
+##### Copy source code
+USER root
+RUN mkdir -p $PAAS
+COPY ./python $PAAS/python
+
+
+##### Setup env
+ENV DOCKER_MODE=1
+
+ENV DATA_PATH=$PAAS/python
+ENV SCENARIO_RUNNER_ROOT=$PAAS/python/carla_interfaces/scenario_runner
+ENV LEADERBOARD_ROOT=$PAAS/python/carla_interfaces/leaderboard
+ENV RESULT_PATH $PAAS/outputs
+ENV RECORD_PATH $PAAS/outputs
+
+RUN mkdir -p $RECORD_PATH
+RUN chown paas -R $RECORD_PATH
+USER paas
+
+################################################
+### Leaderboard challenge setup
+ENV TEAM_AGENT ${TEAM_CODE_ROOT}/python/carla_interfaces/agents/paas_agent.py
+ENV TEAM_CONFIG $PAAS/python/configs/config.yaml
+
+ENV CHALLENGE_TRACK_CODENAME MAP
+ENV SCENARIOS $PAAS/python/data/all_towns_traffic_scenarios_public.json
+ENV ROUTES $PAAS/python/data/routes_training.xml
+ENV REPETITIONS 1
+ENV CHECKPOINT_ENDPOINT ${RESULT_PATH}/results.json
+ENV DEBUG_CHALLENGE 1
+################################################
+
+### For Carla Python API
+##### Copy only API
+ENV CARLA_PATH=$HOME/carla
+COPY --from=carla-builder /home/carla/PythonAPI ${HOME}/carla_python_api
+ENV PYTHONPATH=$PYTHONPATH:${HOME}/carla_python_api/carla/dist/carla-0.9.11-py3.7-linux-x86_64.egg
+ENV PYTHONPATH=$PYTHONPATH:${HOME}/carla_python_api/carla
+ENV PYTHONPATH=$PYTHONPATH:${HOME}/PAAS/python
+
+### Leaderboard Library
+ENV PYTHONPATH=$PYTHONPATH:$SCENARIO_RUNNER_ROOT:$LEADERBOARD_ROOT
+
+##### Install dependencies
+COPY ./requirements.txt $PAAS/requirements.txt
+RUN pip3 install -r $PAAS/requirements.txt
+
+USER root
+RUN chmod +x ${LEADERBOARD_ROOT}/scripts/run_evaluation.sh
+USER paas
+
+# --- Perception modules' dependencies ---
+ENV VANTIX_PERCEPTION ${PAAS}/python/perception
+ENV WEIGHT_FOLDER ${VANTIX_PERCEPTION}/weights
+
+ENV PILOT_CONFIG werling_perfect_perception
+
+# Install PV-RCNN
+USER root
+ENV VANTIX_DETECTION ${VANTIX_PERCEPTION}/vantix_detection
+ENV PV_RCNN_CFG ${VANTIX_DETECTION}/cfgs/waymo_models/pv_rcnn_plusplus_resnet_large.yaml
+ENV PV_RCNN_WEIGHT ${WEIGHT_FOLDER}/pv_rcnn/pv_rcnn_plusplus_resnet_large.pth
+
+RUN pip install SharedArray
+
+RUN git clone https://github.com/open-mmlab/OpenPCDet && \
+    cd OpenPCDet && \
+    python3 setup.py develop
+USER paas
+# end install PV-RCNN
+
+# Install YOLO-X
+USER root
+ENV YOLOX_WEIGHT ${WEIGHT_FOLDER}/yolox/yolox_x.pth
+RUN git clone https://github.com/Megvii-BaseDetection/YOLOX.git && \
+    cd YOLOX && \
+    python3 setup.py develop
+USER paas
+# end install YOLO-X
+
+# --- end Perception modules' dependencies ---
+
+RUN /bin/bash -c "pip3 install cython; pip3 install 'git+https://github.com/cocodataset/cocoapi.git#subdirectory=PythonAPI'"
+
+ENV PYTHONPATH=$PYTHONPATH:${HOME}
+
+COPY ./entrypoint.sh ./entrypoint.sh
+
+RUN /bin/bash
+ENTRYPOINT ["./entrypoint.sh"]
+
+FROM standalone as standalone_ros
+
+USER root
+
+### Install ROS
+RUN echo "deb http://packages.ros.org/ros/ubuntu focal main" > /etc/apt/sources.list.d/ros1-latest.list
+RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C1CF6E31E6BADE8868B172B4F42ED6FBAB17C654
+RUN /bin/bash -c "apt update && apt install -y ros-noetic-desktop"
+
+ENV  ROS_DISTRO=noetic
+
+RUN echo 'alias source_ros="source /opt/ros/${ROS_DISTRO}/setup.bash"' >> ~/.bashrc
+RUN echo 'source /opt/ros/${ROS_DISTRO}/setup.bash' >> ~/.bashrc
+
+USER paas
+
+### Install carla for All-in-One package
+FROM standalone_ros as aio
+
+##### Copy the whole binary Carla
+COPY --from=carla-builder /home/carla ${HOME}/carla
+ENV CARLA_PORT=2000
+
+COPY ./scripts $PAAS/scripts
+
+ENV SDL_VIDEODRIVER=offscreen
+ENV SDL_HINT_CUDA_DEVICE=0
