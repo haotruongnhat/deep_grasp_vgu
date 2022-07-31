@@ -45,9 +45,6 @@ pandas
 pymap3d
 rtree
 sklearn
-torch
-torchvision
-torchsummary
+scikit-image
 tensorboardX
 imageio
-scikit-image

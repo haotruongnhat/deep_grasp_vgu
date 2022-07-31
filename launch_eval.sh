@@ -1,0 +1,1 @@
+python3 eval_ggcnn.py --network /home/robotlab/deep_grasp_vgu/ggcnn/ggcnn_weights_cornell/ggcnn_epoch_23_cornell --dataset cornell --dataset-path /home/robotlab/deep_grasp_vgu/datasets/cornell-grasp --iou-eval --vis

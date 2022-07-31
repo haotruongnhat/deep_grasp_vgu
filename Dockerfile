@@ -1,5 +1,5 @@
 ### Build ROS-supported environment
-FROM nvidia/cuda:11.4.2-devel-ubuntu20.04
+FROM nvidia/cuda:11.4.2-devel-ubuntu20.04 as base
 
 ENV ROS_DISTRO=noetic
 
@@ -32,23 +32,26 @@ WORKDIR /home/robotlab
 ENV HOME=/home/robotlab
 
 USER root
-
-ENV PATH="$PATH:/usr/local/cuda-11.4/bin"
-ENV LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/local/cuda-11.4/lib64"
-ENV TORCH_CUDA_ARCH_LIST="8.0 8.6+PTX"
-
-##### Copy source code
-
 ### Install ROS
 RUN echo "deb http://packages.ros.org/ros/ubuntu focal main" > /etc/apt/sources.list.d/ros1-latest.list
 RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C1CF6E31E6BADE8868B172B4F42ED6FBAB17C654
 RUN /bin/bash -c "apt update && apt install -y ros-noetic-desktop"
 
 RUN echo 'alias source_ros="source /opt/ros/${ROS_DISTRO}/setup.bash"' >> ~/.bashrc
-RUN echo 'source /opt/ros/${ROS_DISTRO}/setup.bash' >> ~/.bashrc
+#RUN echo 'source /opt/ros/${ROS_DISTRO}/setup.bash' >> ~/.bashrc
+
+FROM base AS torch
 
 USER robotlab
 CMD /bin/bash
 
-COPY ./requirements.txt /home/robotlab/requirements.txt
-RUN pip3 install -r /home/robotlab/requirements.txt
+ENV PATH="${HOME}/.local/bin:$PATH"
+
+COPY ./requirements.txt ${HOME}/requirements.txt
+RUN python3 -m pip install --upgrade pip
+
+RUN python3 -m pip install -r ${HOME}/requirements.txt
+RUN python3 -m pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu116
+
+WORKDIR ${HOME}/deep_grasp_vgu
+COPY . .
