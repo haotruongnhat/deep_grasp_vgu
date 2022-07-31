@@ -1,4 +1,4 @@
-docker run -it --rm --runtime=nvidia \
+docker run -it -d --rm --runtime=nvidia \
 --gpus all \
 --privileged \
 --network=host \

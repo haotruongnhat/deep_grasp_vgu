@@ -53,5 +53,14 @@ RUN python3 -m pip install --upgrade pip
 RUN python3 -m pip install -r ${HOME}/requirements.txt
 RUN python3 -m pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu116
 
-WORKDIR ${HOME}/deep_grasp_vgu
-COPY . .
+WORKDIR ${HOME}
+
+RUN mkdir -p ${HOME}/deep_grasp_ws/src
+
+WORKDIR ${HOME}/deep_grasp_ws/src
+RUN git clone https://github.com/haotruongnhat/deep_grasp_msgs
+
+COPY ./deep_grasp_vgu ${HOME}/deep_grasp_ws/src/deep_grasp_vgu
+
+WORKDIR ${HOME}/deep_grasp_ws
+RUN /bin/bash -c "source /opt/ros/${ROS_DISTRO}/setup.bash && catkin_make"
