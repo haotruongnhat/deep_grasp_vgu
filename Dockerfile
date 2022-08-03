@@ -63,4 +63,7 @@ RUN git clone https://github.com/haotruongnhat/deep_grasp_msgs
 COPY ./deep_grasp_vgu ${HOME}/deep_grasp_ws/src/deep_grasp_vgu
 
 WORKDIR ${HOME}/deep_grasp_ws
-RUN /bin/bash -c "source /opt/ros/${ROS_DISTRO}/setup.bash && catkin_make"
+
+SHELL ["/bin/bash", "-c"]
+RUN source /opt/ros/${ROS_DISTRO}/setup.bash && catkin_make
+

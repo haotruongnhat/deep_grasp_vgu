@@ -12,10 +12,10 @@ import cv2
 from tf import transformations as tft
 from dougsm_helpers.timeit import TimeIt
 
-from ggcnn.ggcnn import predict, process_depth_image
+from ggcnn.ggcnn_torch import predict, process_depth_image
 from dougsm_helpers.gridshow import gridshow
 
-from ggcnn.srv import GraspPrediction, GraspPredictionResponse
+from deep_grasp_msgs.srv import GraspPrediction, GraspPredictionResponse
 from sensor_msgs.msg import Image, CameraInfo
 
 import cv_bridge
@@ -23,22 +23,22 @@ bridge = cv_bridge.CvBridge()
 
 TimeIt.print_output = False
 
-
 class GGCNNService:
     def __init__(self):
         # Get the camera parameters
-        cam_info_topic = rospy.get_param('~camera/info_topic')
+        namespace = "/ggcnn_service/"
+        cam_info_topic = rospy.get_param(namespace + 'camera/info_topic')
         camera_info_msg = rospy.wait_for_message(cam_info_topic, CameraInfo)
         self.cam_K = np.array(camera_info_msg.K).reshape((3, 3))
 
         self.img_pub = rospy.Publisher('~visualisation', Image, queue_size=1)
         rospy.Service('~predict', GraspPrediction, self.compute_service_handler)
 
-        self.base_frame = rospy.get_param('~camera/robot_base_frame')
-        self.camera_frame = rospy.get_param('~camera/camera_frame')
-        self.img_crop_size = rospy.get_param('~camera/crop_size')
-        self.img_crop_y_offset = rospy.get_param('~camera/crop_y_offset')
-        self.cam_fov = rospy.get_param('~camera/fov')
+        self.base_frame = rospy.get_param(namespace + 'camera/robot_base_frame')
+        self.camera_frame = rospy.get_param(namespace + 'camera/camera_frame')
+        self.img_crop_size = rospy.get_param(namespace + 'camera/crop_size')
+        self.img_crop_y_offset = rospy.get_param(namespace + 'camera/crop_y_offset')
+        self.cam_fov = rospy.get_param(namespace + 'camera/fov')
 
         self.counter = 0
         self.curr_depth_img = None
@@ -124,6 +124,5 @@ class GGCNNService:
 
 if __name__ == '__main__':
     rospy.init_node('ggcnn_service')
-    import dougsm_helpers.tf_helpers as tfh
     GGCNN = GGCNNService()
     rospy.spin()

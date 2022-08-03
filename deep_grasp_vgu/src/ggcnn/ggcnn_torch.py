@@ -9,13 +9,15 @@ import torch
 
 from dougsm_helpers.timeit import TimeIt
 
-MODEL_FILE = 'models/epoch_24_iou_0.82_morezoom'
-here = path.dirname(path.abspath(__file__))
-sys.path.append(here)
-print(path.join(path.dirname(__file__), MODEL_FILE))
-model = torch.load(path.join(path.dirname(__file__), MODEL_FILE))
-device = torch.device("cuda:0")
+import rospkg
+rospack = rospkg.RosPack()
 
+MODEL_FILE = 'weights/ggcnn_epoch_23_cornell'
+here = rospack.get_path('deep_grasp_vgu')
+print(path.join(here, MODEL_FILE))
+
+model = torch.load(path.join(here, MODEL_FILE))
+device = torch.device("cuda:0")
 
 def process_depth_image(depth, crop_size, out_size=300, return_mask=False, crop_y_offset=0):
     imh, imw = depth.shape
