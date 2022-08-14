@@ -64,6 +64,15 @@ COPY ./deep_grasp_vgu ${HOME}/deep_grasp_ws/src/deep_grasp_vgu
 
 WORKDIR ${HOME}/deep_grasp_ws
 
-SHELL ["/bin/bash", "-c"]
-RUN source /opt/ros/${ROS_DISTRO}/setup.bash && catkin_make
+# USER root
+# RUN apt-get install python3-rosdep \
+#                     ros-noetic-moveit*
+# RUN rosdep init
+# RUN rosdep update
+# RUN rosdep install --from-paths src --ignore-src -r -y
+
+# RUN cd src && git clone -b release/noetic/eigenpy  https://github.com/stack-of-tasks/eigenpy-ros-release.git
+
+# SHELL ["/bin/bash", "-c"]
+# RUN source /opt/ros/${ROS_DISTRO}/setup.bash && catkin_make
 

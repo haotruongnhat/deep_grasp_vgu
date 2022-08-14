@@ -1,0 +1,6 @@
+<launch>
+    <rosparam command="load" file="$(find deep_grasp_cnn)/cfg/ggcnn_service.yaml" />    
+
+    <node pkg="deep_grasp_cnn" type="ggcnn_service.py" name="ggcnn_service" output="screen">
+    </node>
+</launch>

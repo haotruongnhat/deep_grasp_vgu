@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(deep_grasp_vgu)
+project(deep_grasp_cnn)
 
 find_package(catkin REQUIRED COMPONENTS
   rospy
@@ -19,7 +19,7 @@ endif()
 catkin_package(CATKIN_DEPENDS rospy)
 
 catkin_install_python(
-  PROGRAMS src/nodes/ggcnn_service.py
+  PROGRAMS scripts/ggcnn_service.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 install(DIRECTORY launch/

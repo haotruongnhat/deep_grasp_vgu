@@ -12,9 +12,9 @@ from dougsm_helpers.timeit import TimeIt
 import rospkg
 rospack = rospkg.RosPack()
 
-MODEL_FILE = 'weights/ggcnn_epoch_23_cornell'
-here = rospack.get_path('deep_grasp_vgu')
-print(path.join(here, MODEL_FILE))
+MODEL_FILE = 'weights/ggcnn_weights_cornell/ggcnn_epoch_23_cornell'
+here = rospack.get_path('deep_grasp_cnn')
+print("Loading model from:", path.join(here, MODEL_FILE))
 
 model = torch.load(path.join(here, MODEL_FILE))
 device = torch.device("cuda:0")
@@ -69,6 +69,7 @@ def predict(depth, process_depth=True, crop_size=300, out_size=300, depth_nan_ma
     # Inference
     depth = np.clip((depth - depth.mean()), -1, 1)
     depthT = torch.from_numpy(depth.reshape(1, 1, out_size, out_size).astype(np.float32)).to(device)
+
     with torch.no_grad():
         pred_out = model(depthT)
 
