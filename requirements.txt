@@ -8,12 +8,12 @@ hydra-core==1.1.1
 importlib-metadata==4.5.0
 importlib-resources==5.2.2
 ipdb==0.13.8
-ipython==7.24.0
+ipython
 ipython-genutils==0.2.0
-matplotlib==3.4.2
-matplotlib-inline==0.1.2
+matplotlib
+matplotlib-inline
 networkx
-numpy==1.20.3
+numpy
 psutil
 py-trees==0.8.3
 pygame==2.0.1
@@ -24,7 +24,7 @@ pyproj
 python-dateutil==2.8.1
 PyYAML==5.4.1
 requests==2.25.1
-scipy==1.6.3
+scipy
 semantic-version==2.8.5
 simple-watchdog-timer==0.1.1
 six==1.16.0

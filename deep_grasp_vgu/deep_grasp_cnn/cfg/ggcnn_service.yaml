@@ -1,0 +1,10 @@
+ggcnn_service:
+    camera:
+        info_topic: /camera/color/camera_info
+        color_topic: /camera/color/image_raw
+        depth_topic: /camera/depth/image_raw
+        camera_frame: camera_depth_optical_frame
+        robot_base_frame: base_link
+        crop_size: 300
+        crop_y_offset: 0
+        fov: 60

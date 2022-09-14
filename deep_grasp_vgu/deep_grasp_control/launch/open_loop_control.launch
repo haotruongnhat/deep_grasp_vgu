@@ -1,0 +1,4 @@
+<launch>
+    <node pkg="deep_grasp_control" type="open_loop_control.py" name="$(anon control)" output="screen">
+    </node>
+</launch>

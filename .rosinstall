@@ -1,0 +1,14 @@
+# This file is intended for users who want to build MoveIt from source.
+# Used with wstool, users can download source of all packages of MoveIt.
+- git:
+    local-name: deep_grasp_msgs
+    uri: https://github.com/haotruongnhat/deep_grasp_msgs
+    version: master
+- git:
+    local-name: deep_grasp_vgu
+    uri: https://github.com/haotruongnhat/deep_grasp_vgu
+    version: master
+- git:
+    local-name: ros_numpy
+    uri: https://github.com/eric-wieser/ros_numpy
+    version: master
