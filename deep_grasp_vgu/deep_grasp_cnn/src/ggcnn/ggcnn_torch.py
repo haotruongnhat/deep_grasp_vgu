@@ -9,15 +9,30 @@ import torch
 
 from dougsm_helpers.timeit import TimeIt
 
-import rospkg
-rospack = rospkg.RosPack()
+global model, device
+model = None
+device = None
 
-MODEL_FILE = 'weights/ggcnn_weights_cornell/ggcnn_epoch_23_cornell'
-here = rospack.get_path('deep_grasp_cnn')
-print("Loading model from:", path.join(here, MODEL_FILE))
+def load_model_by_ros():
+    global model, device
+    
+    import rospkg
+    rospack = rospkg.RosPack()
 
-model = torch.load(path.join(here, MODEL_FILE))
-device = torch.device("cuda:0")
+    MODEL_FILE = 'weights/ggcnn_weights_cornell/ggcnn_epoch_23_cornell'
+    here = rospack.get_path('deep_grasp_cnn')
+    print("Loading model from:", path.join(here, MODEL_FILE))
+
+    model = torch.load(path.join(here, MODEL_FILE))
+    device = torch.device("cuda:0")
+
+def load_model_by_path(model_path):
+    global model, device
+
+    print("Loading model from:", model_path)
+
+    model = torch.load(model_path)
+    device = torch.device("cuda:0")
 
 def process_depth_image(depth, crop_size, out_size=300, return_mask=False, crop_y_offset=0):
     imh, imw = depth.shape

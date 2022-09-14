@@ -1,0 +1,26 @@
+### Build ROS-supported environment
+FROM haotruongnhat/ros-ur3:melodic as base
+
+USER root
+ENV HOME=/root
+
+COPY ./deep_grasp_vgu ${HOME}/ros_ws/src/deep_grasp_vgu
+
+RUN /bin/bash -c "  cd $HOME/ros_ws/src/deep_grasp_vgu && \
+                    git clone https://github.com/haotruongnhat/deep_grasp_msgs"
+
+# Install torch
+COPY ./wheels/torch-1.10.0+cu111-cp36-cp36m-linux_x86_64.whl $HOME/torch-1.10.0+cu111-cp36-cp36m-linux_x86_64.whl
+RUN python3 -m pip install $HOME/torch-1.10.0+cu111-cp36-cp36m-linux_x86_64.whl
+RUN python3 -m pip install opencv-python
+
+RUN /bin/bash -c "cd $HOME/ros_ws/src  && \
+                git clone -b melodic-devel  https://github.com/ros/geometry2.git && \
+                git clone https://github.com/eric-wieser/ros_numpy"
+
+RUN /bin/bash -c "source /opt/ros/$ROS_DISTRO/setup.bash \
+               && cd ~/ros_ws \
+               && catkin build -DPYTHON_EXECUTABLE=/usr/bin/python3 \
+                                -DPYTHON_LIBRARY=/usr/lib/x86_64-linux-gnu/libpython3.6m.so \
+                                -DPYTHON_INCLUDE_DIR=/usr/include/python3.6m \
+                                -DPYTHON_VERSION=3"
