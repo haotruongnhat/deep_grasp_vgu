@@ -18,6 +18,24 @@ def _init_tf():
     tfBuffer = tf2_ros.Buffer()
     listener = tf2_ros.TransformListener(tfBuffer)
 
+def offset_euler_position(current_position, offset_x, offset_y, offset_z):
+    new_position = gmsg.Point()
+    new_position.x = current_position.x + offset_x
+    new_position.y = current_position.y + offset_y
+    new_position.z = current_position.z + offset_z
+
+    return new_position
+
+def offset_euler_angles(current_quaternion, offset_r = 0, offset_p = 0, offset_y = 0):
+    current_rpy = list(tft.euler_from_quaternion(tfh.quaternion_to_list(current_quaternion)))
+    current_rpy[0] += offset_r
+    current_rpy[1] += offset_p
+    current_rpy[2] += offset_y
+
+    new_quaternion = tfh.list_to_quaternion(tft.quaternion_from_euler(current_rpy))
+
+    return new_quaternion
+
 
 def quaternion_to_list(quaternion):
     return [quaternion.x, quaternion.y, quaternion.z, quaternion.w]
