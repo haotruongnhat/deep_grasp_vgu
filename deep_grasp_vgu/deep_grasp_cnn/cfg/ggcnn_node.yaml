@@ -1,4 +1,4 @@
-ggcnn_service:
+ggcnn_node:
     camera:
         info_topic: /camera/color/camera_info
         color_topic: /camera/color/image_raw

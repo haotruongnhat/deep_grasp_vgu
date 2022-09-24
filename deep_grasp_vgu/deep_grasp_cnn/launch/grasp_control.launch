@@ -1,0 +1,6 @@
+<launch>
+    <!-- <include file="$(find ur_gripper_85_moveit_config)/launch/start_moveit.launch" /> -->
+
+    <node pkg="deep_grasp_cnn" type="grasp_control.py" name="grasp_control" output="screen">
+    </node>
+</launch>

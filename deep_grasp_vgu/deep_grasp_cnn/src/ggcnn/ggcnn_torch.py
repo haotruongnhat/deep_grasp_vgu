@@ -26,6 +26,8 @@ def load_model_by_ros():
     model = torch.load(path.join(here, MODEL_FILE))
     device = torch.device("cuda:0")
 
+    return True
+
 def load_model_by_path(model_path):
     global model, device
 

@@ -19,7 +19,7 @@ endif()
 catkin_package(CATKIN_DEPENDS rospy)
 
 catkin_install_python(
-  PROGRAMS scripts/ggcnn_service.py
+  PROGRAMS scripts/ggcnn_node.py scripts/grasp_control.py 
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 install(DIRECTORY launch/

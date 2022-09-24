@@ -14,6 +14,8 @@ from tf import transformations as tft
 import tf
 
 import dougsm_helpers.tf_helpers as tfh
+import angles
+
 from dougsm_helpers.timeit import TimeIt
 
 from dougsm_helpers.gridshow import gridshow
@@ -23,18 +25,30 @@ from deep_grasp_msgs.srv import GraspPrediction, GraspPredictionResponse
 
 from sensor_msgs.msg import Image, CameraInfo
 from geometry_msgs.msg import PoseStamped, Pose
+from visualization_msgs.msg import MarkerArray, Marker
 
 from std_srvs.srv import Trigger, TriggerResponse
 from gazebo_msgs.msg import ModelStates, LinkStates
 
-import moveit_commander
-import moveit_msgs.msg
-from moveit_commander.conversions import pose_to_list
-
 import ros_numpy
 from ros_numpy import numpify, msgify
 
+from loguru import logger
+logger.remove()
+logger.add(sys.stderr, format='<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <level>{message}</level>', level="INFO")
+
 TimeIt.print_output = False
+MAX_GRIPPER = 0.8
+MIN_GRIPPER = 0.0
+
+MOVABLE_GRIPPER_VALUE = MAX_GRIPPER - MIN_GRIPPER
+
+MAX_GRIPPER_WIDTH  = 0.016055490931148223
+MIN_GRIPPER_WIDTH = 0.0998695579020194
+MOVABLE_WIDTH = MIN_GRIPPER_WIDTH - MAX_GRIPPER_WIDTH
+
+A = (MAX_GRIPPER-MIN_GRIPPER)/(MAX_GRIPPER_WIDTH - MIN_GRIPPER_WIDTH)
+B = MIN_GRIPPER - A*MIN_GRIPPER_WIDTH
 
 class GGCNNService:
     def __init__(self):
@@ -42,8 +56,9 @@ class GGCNNService:
         self.waiting = False
         self.received = False
         self.enable_loop = False
+        self.done_loading_model = False
 
-        namespace = "/ggcnn_service/"
+        namespace = "/ggcnn_node/"
         cam_info_topic = rospy.get_param(namespace + 'camera/info_topic')
         camera_info_msg = rospy.wait_for_message(cam_info_topic, CameraInfo)
         self.cam_K = np.array(camera_info_msg.K).reshape((3, 3))
@@ -67,60 +82,10 @@ class GGCNNService:
         rospy.Service(namespace + 'predict_loop', Trigger, self.trigger_predict_loop)
 
         self.grasp_pred_pub = rospy.Publisher(namespace + 'grasp_pred', PoseStamped, queue_size=1)
-        self.grasp_gt_pub = rospy.Publisher(namespace + 'grasp_gt', PoseStamped, queue_size=1)
-
         self.predict_map_pub = rospy.Publisher(namespace + 'predict_map', Image, queue_size=1)
 
-        rospy.Subscriber('/gazebo/link_states', LinkStates, self._link_callback, queue_size=1)
-
-        ### Init MoveIt Interface
-        robot = moveit_commander.RobotCommander()
-        scene = moveit_commander.PlanningSceneInterface()
-
-        group_name = "arm"
-        self.group = moveit_commander.MoveGroupCommander(group_name)
-        display_trajectory_publisher = rospy.Publisher('/move_group/display_planned_path',
-                                                    moveit_msgs.msg.DisplayTrajectory,
-                                                    queue_size=20)
-
-        ## Move to home position
-        self.home_pose = self.group.get_current_pose().pose
-        self.home_pose.position.x = -0.111
-        self.home_pose.position.y = 0.297
-        self.home_pose.position.z = 0.40
-
-        (plan, fraction) = self.group.compute_cartesian_path(
-                                   [self.home_pose],   # waypoints to follow
-                                   0.01,        # eef_step
-                                   0.0)         # jump_threshold
-
-        self.group.execute(plan, wait=True)
-
-        load_model_by_ros()
-        print("Done initialization")
-
-    def _link_callback(self, msg):
-        target_object = "cube2::link"
-        object_index = msg.name.index(target_object)
-        object_pose_to_world = msg.pose[object_index]
-
-        obj_to_world_matrix = numpify(object_pose_to_world)
-
-        target_robot = "robot::base_link"
-        robot_index = msg.name.index(target_robot)
-        robot_pose_to_world = msg.pose[robot_index]
-
-        robot_to_world_matrix = numpify(robot_pose_to_world)
-
-        ## Checked: OK
-        object_to_robot_matrix = np.dot(np.linalg.inv(robot_to_world_matrix), obj_to_world_matrix)
-
-        gt_pose = PoseStamped()
-        gt_pose.header.frame_id = self.base_frame
-
-        gt_pose.pose = msgify(Pose, object_to_robot_matrix)
-
-        self.grasp_gt_pub.publish(gt_pose)
+        self.done_loading_model = load_model_by_ros()
+        logger.info("Done initialization")
 
     def _depth_img_callback(self, msg):
         # Doing a rospy.wait_for_message is super slow, compared to just subscribing and keeping the newest one.
@@ -143,13 +108,16 @@ class GGCNNService:
         self.waiting = False
         self.received = False
 
+        if not self.done_loading_model:
+            return
+
         if not self.enable_loop:
             with TimeIt('Total'):
                 ret = self.grasp_predict()
                 return ret
 
     def trigger_predict_loop(self, req):
-        print("Enable predict loop")
+        logger.info("Enable predict loop")
 
         self.enable_loop = not self.enable_loop
         self.waiting = True
@@ -160,8 +128,24 @@ class GGCNNService:
 
         return res
 
+    def gripper_command(self, gripper_width, wait=True):
+        """ In meters
+        """
+        if (gripper_width < 0.0) & (gripper_width > (MIN_GRIPPER_WIDTH - MAX_GRIPPER_WIDTH)):
+            logger.warning("Gripper width out of bound")
+
+        gripper_width += MAX_GRIPPER_WIDTH
+        gripper_width = np.clip(gripper_width, MAX_GRIPPER_WIDTH, MIN_GRIPPER_WIDTH)
+
+        gripper_value = np.clip(A*gripper_width + B, MIN_GRIPPER, MAX_GRIPPER)
+
+        signed = np.array([1, -1, 1, 1, -1, 1])
+        self.gripper_home_pose = list(signed*gripper_value)
+
+        self.move_group_gripper.go(self.gripper_home_pose, wait=wait)
+
     def grasp_predict(self):
-        print("Running grasp predict")
+        logger.info("Running grasp predict")
         depth = self.curr_depth_img.copy()
 
         camera_pose = self.last_image_pose
@@ -212,6 +196,6 @@ class GGCNNService:
         return ret
 
 if __name__ == '__main__':
-    rospy.init_node('ggcnn_service')
+    rospy.init_node('ggcnn_node')
     GGCNN = GGCNNService()
     rospy.spin()
